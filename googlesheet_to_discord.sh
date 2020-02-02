@@ -14,51 +14,60 @@
 #  
 ###############################################################################################################################################################
 # Modifiable Parameters
-GSHEET="https://docs.google.com/spreadsheets/d/e/REDACTED/pub?output=csv"
-STATE=/home/username/statefile
+GSHEET="https://docs.google.com/spreadsheets/d/e/REDACTED/pub?gid=0&single=true&output=csv"
+STATE=/home/REDACTED/.discord-state
 DISCORD="https://discordapp.com/api/webhooks/REDACTED"
-NICK="USERNAME"
+NICK="DiscordNICK"
 
 # Initializing Temporary Files
 FILE=$(mktemp)
 LAINI=$(mktemp)
+
 trap "rm $FILE $LAINI" 0 1 2 3 15
 
 # Downloading the Google Sheet CSV and removing unwanted crlf - linebreaks from the sheet
 curl -s "$GSHEET" | tr -d '\r' > $FILE
+echo $'\n' >> $FILE
 # Counting current file rows
 ROWS=`wc -l $FILE | awk ' { print $1 } '`
 # Checking last row that has been sent to Discord
 STATEL=`cat $STATE | awk ' { print $1 } '`
+#echo STATEL $STATEL
 
-
+if [ $STATEL -le $ROWS ] ; then
 while [[ $STATEL -le $ROWS ]]; do
 #Process line after last row
-S3=$(($STATEL+1))
+S3=$(($STATEL))
 LINE=$(sed ""$S3"q;d" $FILE)
 echo $LINE > $LAINI
-cat $LAINI
-while IFS=$',' read TS NAME REALM DUSER CLASS SCORE; do
+cat $LAINI--
+while IFS=$',' read TS NAME REALM DUSER CLASS ROLE SCORE; do
 CNAME=$NAME
 REALMI=$REALM
 DUSERI=$DUSER
 CLASSI=$CLASS
+ROOLI=$ROLE
 SC=$SCORE
 
-echo $CNAME $REALMI $DUSERI $CLASSI $SC
-
-
+if [ -z "$ROOLI" ]; then
+echo "tyhja"
+else
 generate_post_data() {
 cat <<EOF
-{ "username": "$NICK", "content": "Ideal Candidate Found! Character Name: $CNAME Realm: $REALMI Discord Usename: $DUSERI Class : $CLASSI Score: $SC" }
+{ "username": "$NICK", "content": "Ideal Candidate Found! Character Name: $CNAME Realm: $REALMI Discord Usename: $DUSERI Class : $CLASSI Role: $ROOLI Score: $SC" }
 EOF
 }
 
-
-
+#echo  "$(generate_post_data)"
 curl -H "Content-Type: application/json" -X POST -d "$(generate_post_data)" $DISCORD 
+fi
 
 done <$LAINI
-
-STATEL=$S3
+STATEL=$(($STATEL+1))
+sleep 5
 done
+echo $(($ROWS)) > $STATE
+echo $ROWS
+else 
+exit 1
+fi
